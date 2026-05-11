@@ -13,11 +13,14 @@ from .auth import list_accounts as auth_list_accounts
 
 
 def auth_operations(
-    action: Literal["list", "authenticate", "complete_auth", "refresh", "logout", "status"],
+    account_id: str = "default",
+    action: Literal["list", "authenticate", "complete_auth", "refresh", "logout", "status"] = "status",
     flow_cache: str | None = None,
-    account_id: str | None = None
 ) -> dict[str, Any]:
-    """Authentication operations for Microsoft accounts
+    """Authentication operations for the configured Microsoft account.
+
+    account_id is accepted for tool consistency. In H4 single-user mode, use
+    "default" or omit it.
     
     Actions:
     - list: List all signed-in Microsoft accounts

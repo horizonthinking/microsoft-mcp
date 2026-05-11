@@ -17,28 +17,32 @@ def request(
     params: dict[str, Any] | None = None,
     json: dict[str, Any] | None = None,
     data: bytes | None = None,
+    headers: dict[str, str] | None = None,
     max_retries: int = 3,
 ) -> dict[str, Any] | None:
-    headers = {
+    request_headers = {
         "Authorization": f"Bearer {get_token(account_id)}",
     }
 
     if method == "GET":
         if "$search" in (params or {}):
-            headers["Prefer"] = 'outlook.body-content-type="text"'
+            request_headers["Prefer"] = 'outlook.body-content-type="text"'
         elif "body" in (params or {}).get("$select", ""):
-            headers["Prefer"] = 'outlook.body-content-type="text"'
+            request_headers["Prefer"] = 'outlook.body-content-type="text"'
     else:
-        headers["Content-Type"] = (
+        request_headers["Content-Type"] = (
             "application/json" if json else "application/octet-stream"
         )
+
+    if headers:
+        request_headers.update(headers)
 
     if params and (
         "$search" in params
         or "contains(" in params.get("$filter", "")
         or "/any(" in params.get("$filter", "")
     ):
-        headers["ConsistencyLevel"] = "eventual"
+        request_headers["ConsistencyLevel"] = "eventual"
         params.setdefault("$count", "true")
 
     retry_count = 0
@@ -47,7 +51,7 @@ def request(
             response = _client.request(
                 method=method,
                 url=f"{BASE_URL}{path}",
-                headers=headers,
+                headers=request_headers,
                 params=params,
                 json=json,
                 content=data,

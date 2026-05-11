@@ -113,6 +113,23 @@ claude
 
 ## Manual Setup
 
+### H4 Single-User Setup
+
+This fork can run as a single-user MCP server using the existing H4
+MongoDB-backed Office 365 token instead of a new MSAL device-flow token cache.
+
+```bash
+export MICROSOFT_MCP_AUTH_MODE=h4_user_profile
+export MICROSOFT_MCP_AGENT_CLI_PATH=/Users/michasmi/projects/local/agent-cli
+uv run microsoft-mcp
+```
+
+The server resolves `H4APIUSER_ID` and `H4APIAPI_KEY` from the environment, or
+from `~/local/env/envvar.json` when they are not inherited by the parent app.
+Those credentials initialize `accessor_user_profile.UserProfile`, which reads
+the sustained Office 365 access token from MongoDB. In this mode,
+`account_id` is optional for the MCP tools; omit it or pass `default`.
+
 ### 1. Azure App Registration
 
 1. Go to [Azure Portal](https://portal.azure.com) → Microsoft Entra ID → App registrations

@@ -38,8 +38,8 @@ def format_calendar_event(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def calendar_operations(
-    account_id: str,
-    action: Literal["list", "create", "update", "delete", "search", "availability", "invite", "get"],
+    account_id: str = "default",
+    action: Literal["list", "create", "update", "delete", "search", "availability", "invite", "get"] = "list",
     # List action parameters
     start_date: str | None = None,
     end_date: str | None = None,
@@ -62,7 +62,9 @@ def calendar_operations(
     # Availability action parameters
     duration_minutes: int = 30
 ) -> dict[str, Any]:
-    """Calendar operations for Microsoft Outlook
+    """Calendar operations for the configured Microsoft Outlook account.
+
+    account_id is optional for this single-user server; use "default" or omit it.
     
     Actions:
     - list: Get calendar events (start_date, end_date, limit, calendar_id)

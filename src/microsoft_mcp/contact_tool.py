@@ -41,8 +41,8 @@ def format_contact(contact: dict[str, Any]) -> dict[str, Any]:
 
 
 def contact_operations(
-    account_id: str,
-    action: Literal["list", "create", "update", "delete", "search"],
+    account_id: str = "default",
+    action: Literal["list", "create", "update", "delete", "search"] = "list",
     # List/Search action parameters
     limit: int = 20,
     search_query: str | None = None,
@@ -58,7 +58,9 @@ def contact_operations(
     # Search action parameters
     query: str | None = None
 ) -> dict[str, Any]:
-    """Contact operations for Microsoft Outlook
+    """Contact operations for the configured Microsoft Outlook account.
+
+    account_id is optional for this single-user server; use "default" or omit it.
     
     Actions:
     - list: List contacts from account (limit, search_query)

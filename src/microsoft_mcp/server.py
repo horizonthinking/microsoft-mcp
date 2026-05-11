@@ -1,12 +1,15 @@
 import os
 import sys
+from .auth import assert_configured
 from .tools import mcp
 
 
 def main() -> None:
-    if not os.getenv("MICROSOFT_MCP_CLIENT_ID"):
+    try:
+        assert_configured()
+    except Exception as exc:
         print(
-            "Error: MICROSOFT_MCP_CLIENT_ID environment variable is required",
+            f"Error: Microsoft MCP authentication is not configured: {exc}",
             file=sys.stderr,
         )
         sys.exit(1)

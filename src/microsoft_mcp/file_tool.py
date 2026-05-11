@@ -32,8 +32,8 @@ def format_file_item(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def file_operations(
-    account_id: str,
-    action: Literal["list", "upload", "download", "delete", "share", "search"],
+    account_id: str = "default",
+    action: Literal["list", "upload", "download", "delete", "share", "search"] = "list",
     # List action parameters
     folder_path: str | None = None,
     limit: int = 20,
@@ -53,7 +53,9 @@ def file_operations(
     query: str | None = None,
     file_type: str | None = None
 ) -> dict[str, Any]:
-    """File operations for Microsoft OneDrive
+    """File operations for the configured Microsoft OneDrive account.
+
+    account_id is optional for this single-user server; use "default" or omit it.
     
     Actions:
     - list: List files in OneDrive (folder_path, limit, search_query)

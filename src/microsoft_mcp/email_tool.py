@@ -60,8 +60,8 @@ def parse_email_input(email_input: str | list[str]) -> list[str]:
 
 
 def email_operations(
-    account_id: str,
-    action: Literal["list", "send", "reply", "draft", "delete", "forward", "move", "mark", "search", "get"],
+    account_id: str = "default",
+    action: Literal["list", "send", "reply", "draft", "delete", "forward", "move", "mark", "search", "get"] = "list",
     # List action parameters
     folder_name: str | None = None,
     limit: int = 50,
@@ -91,7 +91,9 @@ def email_operations(
     folder: str | None = None,
     has_attachments: bool | None = None
 ) -> dict[str, Any]:
-    """Email operations for Microsoft Outlook
+    """Email operations for the configured Microsoft Outlook account.
+
+    account_id is optional for this single-user server; use "default" or omit it.
     
     Actions:
     - list: Get emails from folder (folder_name, limit, include_body, search_query, skip)

@@ -54,7 +54,7 @@ def test_nuclear_tools_signatures():
         except Exception as e:
             results[tool_name] = f"❌ Signature error: {e}"
 
-    return results
+    assert all("✅" in result for result in results.values()), results
 
 
 def test_nuclear_tools_fastmcp_registration():
@@ -62,13 +62,10 @@ def test_nuclear_tools_fastmcp_registration():
     try:
         from microsoft_mcp.tools import mcp
 
-        # Check if FastMCP instance exists
-        if hasattr(mcp, "app"):
-            return "✅ FastMCP registration successful"
-        return "❌ FastMCP registration failed - no app attribute"
+        assert mcp.name == "microsoft-mcp"
 
     except Exception as e:
-        return f"❌ FastMCP registration failed: {e}"
+        assert False, f"FastMCP registration failed: {e}"
 
 
 def test_nuclear_architecture_validation():
@@ -84,10 +81,11 @@ def test_nuclear_architecture_validation():
             token_estimate = char_count // 4  # Rough estimate: 4 chars per token
 
             if char_count < 2000:  # Should be much smaller than 63k
-                return f"✅ Nuclear simplification achieved: {char_count} chars (~{token_estimate} tokens)"
-            return f"❌ Tools.py still too large: {char_count} chars"
+                assert True
+                return
+            assert False, f"tools.py still too large: {char_count} chars"
     else:
-        return "❌ tools.py not found"
+        assert False, "tools.py not found"
 
 
 def test_nuclear_tool_files_exist():
@@ -111,7 +109,7 @@ def test_nuclear_tool_files_exist():
         else:
             results[tool_file] = "❌ Missing"
 
-    return results
+    assert all("✅" in result for result in results.values()), results
 
 
 def main():
