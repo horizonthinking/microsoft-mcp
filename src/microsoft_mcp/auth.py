@@ -1,10 +1,10 @@
 import json
 import os
 import pathlib as pl
-import sys
 from typing import Any, NamedTuple
 
 import msal
+from pymongo import MongoClient
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,7 +12,6 @@ load_dotenv()
 CACHE_FILE = pl.Path.home() / ".microsoft_mcp_token_cache.json"
 SCOPES = ["https://graph.microsoft.com/.default"]
 H4_AUTH_MODES = {"h4", "h4_user_profile", "user_profile", "mongodb"}
-DEFAULT_AGENT_CLI_PATH = pl.Path.home() / "projects" / "local" / "agent-cli"
 ENVVAR_PATHS = [
     pl.Path.home() / "local" / "env" / "envvar.json",
     pl.Path.home()
@@ -24,6 +23,7 @@ ENVVAR_PATHS = [
     / "envvar.json",
 ]
 _envvar_cache: dict[str, Any] | None = None
+_h4_profile_cache: dict[str, Any] | None = None
 
 
 class Account(NamedTuple):
@@ -67,19 +67,19 @@ def using_h4_user_profile() -> bool:
     return auth_mode() in H4_AUTH_MODES
 
 
-def _get_h4_profile():
-    agent_cli_path = pl.Path(
-        _env("MICROSOFT_MCP_AGENT_CLI_PATH", str(DEFAULT_AGENT_CLI_PATH)) or ""
-    ).expanduser()
-    if str(agent_cli_path) not in sys.path:
-        sys.path.insert(0, str(agent_cli_path))
+def _h4_mongodb_uri() -> str:
+    explicit = _env("MICROSOFT_MCP_MONGODB_URI") or _env(
+        "MONGODB_CONNECTION_STRING_DEFAULT"
+    )
+    if explicit:
+        return explicit.replace(":27018", ":27017") if _env("MICROSOFT_MCP_VM_MODE") == "1" else explicit
+    return "mongodb://localhost:27017" if _env("MICROSOFT_MCP_VM_MODE") == "1" else "mongodb://localhost:27018"
 
-    try:
-        from accessor_user_profile import UserProfile
-    except ImportError as exc:
-        raise RuntimeError(
-            f"Cannot import accessor_user_profile from {agent_cli_path}"
-        ) from exc
+
+def _get_h4_profile() -> dict[str, Any]:
+    global _h4_profile_cache
+    if _h4_profile_cache is not None:
+        return _h4_profile_cache
 
     user_id = _env("H4APIUSER_ID")
     api_key = _env("H4APIAPI_KEY")
@@ -93,12 +93,46 @@ def _get_h4_profile():
             "Missing H4 UserProfile configuration: " + ", ".join(missing)
         )
 
-    return UserProfile.initialize(user_id=user_id, api_key=api_key)
+    database_name = _env("MICROSOFT_MCP_H4_DATABASE", "h4_focus") or "h4_focus"
+    collection_name = _env("MICROSOFT_MCP_H4_COLLECTION", "focus") or "focus"
+    client = MongoClient(_h4_mongodb_uri(), serverSelectionTimeoutMS=5000)
+    collection = client[database_name][collection_name]
+
+    user_doc = collection.find_one({"id": user_id, "type": "user"})
+    if not user_doc:
+        raise RuntimeError(f"H4 user profile not found for {user_id}")
+
+    user_data = user_doc.get("data", {})
+    valid_keys = user_data.get("api_key", [])
+    if isinstance(valid_keys, list) and api_key not in valid_keys:
+        raise RuntimeError("H4 user profile API key validation failed")
+
+    tokens = [
+        doc.get("data", {})
+        for doc in collection.find({"type": "user_token", "user": user_id})
+        if doc.get("data")
+    ]
+
+    office365_user_id = user_data.get("office365_user_id")
+    if not office365_user_id:
+        for token in tokens:
+            token_user_id = token.get("user_id") or token.get("id") or token.get("_id")
+            if token_user_id and token.get("access_token"):
+                office365_user_id = token_user_id
+                break
+
+    _h4_profile_cache = {
+        "user_id": user_id,
+        "user_data": user_data,
+        "office365_user_id": office365_user_id,
+        "tokens": tokens,
+    }
+    return _h4_profile_cache
 
 
 def assert_configured() -> None:
     if using_h4_user_profile():
-        _get_h4_profile()
+        _get_h4_user_profile_token()
         return
     if not _env("MICROSOFT_MCP_CLIENT_ID"):
         raise ValueError("MICROSOFT_MCP_CLIENT_ID environment variable is required")
@@ -106,11 +140,12 @@ def assert_configured() -> None:
 
 def _h4_account() -> Account:
     profile = _get_h4_profile()
+    user_data = profile["user_data"]
     username = (
-        profile.properties.get("email")
-        or profile.properties.get("Email")
-        or profile.properties.get("office365_user_id")
-        or profile.user_id
+        user_data.get("email")
+        or user_data.get("Email")
+        or profile.get("office365_user_id")
+        or profile.get("user_id")
         or "h4-user-profile"
     )
     return Account(username=str(username), account_id="default")
@@ -118,12 +153,27 @@ def _h4_account() -> Account:
 
 def _get_h4_user_profile_token() -> str:
     profile = _get_h4_profile()
-    token = profile.current_access_token
-    if not token:
-        raise RuntimeError(
-            "No Office 365 access token found in MongoDB for this H4 user profile"
-        )
-    return token
+    office365_user_id = profile.get("office365_user_id")
+
+    for token in profile["tokens"]:
+        if (
+            token.get("_id") == office365_user_id
+            or token.get("document_id") == office365_user_id
+            or token.get("user_id") == office365_user_id
+            or token.get("id") == office365_user_id
+        ):
+            access_token = token.get("access_token")
+            if access_token:
+                return access_token
+
+    for token in profile["tokens"]:
+        access_token = token.get("access_token")
+        if access_token:
+            return access_token
+
+    raise RuntimeError(
+        "No Office 365 access token found in MongoDB for this H4 user profile"
+    )
 
 
 def _read_cache() -> str | None:
